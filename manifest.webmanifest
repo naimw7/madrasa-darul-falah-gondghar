@@ -1,0 +1,11 @@
+{
+  "name": "Madrasa Darul Falah Accounts",
+  "short_name": "Darul Falah",
+  "description": "Offline-first accounts prototype for Madrasa Darul Falah Gondghar",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f7f4",
+  "theme_color": "#14532d",
+  "lang": "en",
+  "categories": ["education", "business"]
+}

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14532d">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Madrasa Darul Falah — Accounts</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#17211b;background:#f4f7f4}
+*{box-sizing:border-box}body{margin:0}.top{background:#14532d;color:white;padding:22px max(18px,calc((100% - 1000px)/2))}
+.top h1{font-size:22px;margin:0 0 5px}.top p{margin:0;color:#d7eadc;font-size:14px}
+main{max-width:1000px;margin:22px auto;padding:0 16px}.notice{padding:12px 14px;border-radius:10px;background:#fff7df;border:1px solid #f0d68a;color:#674c00;font-size:13px;margin-bottom:18px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.card,.panel{background:white;border:1px solid #e0e8e1;border-radius:14px;padding:16px;box-shadow:0 2px 8px #10201008}
+.label{color:#617067;font-size:13px}.amount{font-size:25px;font-weight:750;margin-top:6px;overflow-wrap:anywhere}.green{color:#14733c}.red{color:#b42318}
+.columns{display:grid;grid-template-columns: minmax(260px, .85fr) minmax(0,1.4fr);gap:16px;margin-top:16px}
+h2{font-size:17px;margin:0 0 14px}label{display:block;font-size:13px;color:#47554b;margin:11px 0 5px}
+input,select,button{font:inherit}input,select{width:100%;padding:11px;border:1px solid #cbd7cd;border-radius:9px;background:white}
+button{border:0;border-radius:9px;padding:11px 14px;cursor:pointer;font-weight:650}.primary{background:#166534;color:white;width:100%;margin-top:14px}.secondary{background:#e7f0e8;color:#14532d}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.toolbar input{flex:1;min-width:140px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px 7px;border-bottom:1px solid #edf1ed}th{color:#617067;font-weight:600}.empty{text-align:center;color:#68756b;padding:28px 10px}
+.small{font-size:12px;color:#6a756d;margin-top:12px}.pill{display:inline-block;padding:4px 8px;border-radius:20px;background:#e7f0e8;color:#14532d;font-size:12px}
+@media(max-width:700px){.cards{grid-template-columns:1fr}.columns{grid-template-columns:1fr}.amount{font-size:22px}.panel{padding:13px}table{font-size:12px}th,td{padding:8px 4px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 id="brand">Madrasa Darul Falah</h1>
+  <p id="subtitle">Gondghar · Accounts management</p>
+</header>
+<main>
+  <div class="notice"><strong id="localTitle">Local prototype:</strong> <span id="localText">Records are saved on this device only. Online sync, login and cloud backup are not active yet.</span> <span class="pill" id="status">Offline-ready shell</span></div>
+  <section class="cards">
+    <div class="card"><div class="label" id="incomeLabel">Total income</div><div class="amount green" id="incomeTotal">₹0.00</div></div>
+    <div class="card"><div class="label" id="expenseLabel">Total expenses</div><div class="amount red" id="expenseTotal">₹0.00</div></div>
+    <div class="card"><div class="label" id="balanceLabel">Balance</div><div class="amount" id="balanceTotal">₹0.00</div></div>
+  </section>
+  <section class="columns">
+    <div class="panel">
+      <h2 id="formTitle">Add transaction</h2>
+      <form id="entryForm">
+        <label for="kind" id="kindLabel">Transaction type</label>
+        <select id="kind" required><option value="income">Income</option><option value="expense">Expense</option></select>
+        <label for="date" id="dateLabel">Date</label>
+        <input id="date" type="date" required>
+        <label for="category" id="categoryLabel">Category</label>
+        <select id="category" required>
+          <option>Fees</option><option>Donation</option><option>General income</option>
+          <option>Salary</option><option>Food & kitchen</option><option>Books & supplies</option>
+          <option>Utilities</option><option>Repairs</option><option>Transport</option><option>Other</option>
+        </select>
+        <label for="description" id="descriptionLabel">Description</label>
+        <input id="description" maxlength="160" placeholder="e.g. Monthly student fees" required>
+        <label for="amount" id="amountLabel">Amount (₹)</label>
+        <input id="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required>
+        <label for="reference" id="referenceLabel">Receipt / reference (optional)</label>
+        <input id="reference" maxlength="80" placeholder="Receipt number or note">
+        <button class="primary" type="submit" id="saveButton">Save transaction</button>
+      </form>
+      <p class="small" id="localHint">Use sample data first. Do not enter sensitive or official records in this prototype.</p>
+      <button class="secondary" id="exportButton" type="button">Export CSV</button>
+      <button class="secondary" id="languageButton" type="button">اردو</button>
+    </div>
+    <div class="panel">
+      <h2 id="listTitle">Recent transactions</h2>
+      <div class="toolbar"><input id="search" placeholder="Search description or category"><button class="secondary" id="clearButton" type="button">Clear all</button></div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th id="thDate">Date</th><th id="thDetail">Details</th><th id="thType">Type</th><th id="thAmount">Amount</th></tr></thead><tbody id="rows"></tbody></table>
+      </div>
+      <div class="empty" id="empty">No transactions yet. Add your first entry.</div>
+    </div>
+  </section>
+</main>
+<script>
+const DB_NAME = "darul-falah-accounts-prototype";
+const STORE = "transactions";
+let db, lang = "en", entries = [];
+const $ = id => document.getElementById(id);
+const money = n => new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(n);
+function openDB(){
+ return new Promise((resolve,reject)=>{
+  const req=indexedDB.open(DB_NAME,1);
+  req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:"id",autoIncrement:true})};
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+ });
+}
+function getAll(){
+ return new Promise((resolve,reject)=>{const r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+}
+function addEntry(item){
+ return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).add(item);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+}
+function clearEntries(){
+ return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+}
+function render(){
+ const income=entries.filter(e=>e.kind==="income").reduce((s,e)=>s+e.amount,0);
+ const expense=entries.filter(e=>e.kind==="expense").reduce((s,e)=>s+e.amount,0);
+ $("incomeTotal").textContent=money(income);$("expenseTotal").textContent=money(expense);$("balanceTotal").textContent=money(income-expense);
+ const q=$("search").value.toLowerCase();
+ const visible=[...entries].reverse().filter(e=>(e.description+" "+e.category+" "+e.reference).toLowerCase().includes(q));
+ $("rows").innerHTML="";
+ for(const e of visible){
+  const tr=document.createElement("tr");
+  const vals=[e.date,e.description+" · "+e.category,e.kind==="income"?(lang==="en"?"Income":"آمدنی"):(lang==="en"?"Expense":"خرچ"),money(e.amount)];
+  vals.forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i===2)td.style.color=e.kind==="income"?"#14733c":"#b42318";tr.appendChild(td)});
+  $("rows").appendChild(tr);
+ }
+ $("empty").style.display=visible.length?"none":"block";
+}
+const translations={
+ en:{subtitle:"Gondghar · Accounts management",localTitle:"Local prototype:",localText:"Records are saved on this device only. Online sync, login and cloud backup are not active yet.",incomeLabel:"Total income",expenseLabel:"Total expenses",balanceLabel:"Balance",formTitle:"Add transaction",kindLabel:"Transaction type",dateLabel:"Date",categoryLabel:"Category",descriptionLabel:"Description",amountLabel:"Amount (₹)",referenceLabel:"Receipt / reference (optional)",saveButton:"Save transaction",localHint:"Use sample data first. Do not enter sensitive or official records in this prototype.",listTitle:"Recent transactions",thDate:"Date",thDetail:"Details",thType:"Type",thAmount:"Amount",empty:"No transactions yet. Add your first entry.",search:"Search description or category",clear:"Clear all",language:"اردو"},
+ ur:{subtitle:"گوندگھر · حسابات کا انتظام",localTitle:"ابتدائی نمونہ:",localText:"ریکارڈ صرف اسی ڈیوائس میں محفوظ ہوتے ہیں۔ آن لائن ہم آہنگی، لاگ اِن اور کلاؤڈ بیک اَپ ابھی فعال نہیں ہیں۔",incomeLabel:"کل آمدنی",expenseLabel:"کل اخراجات",balanceLabel:"باقی رقم",formTitle:"نیا اندراج",kindLabel:"اندراج کی قسم",dateLabel:"تاریخ",categoryLabel:"مد",descriptionLabel:"تفصیل",amountLabel:"رقم (₹)",referenceLabel:"رسید / حوالہ (اختیاری)",saveButton:"اندراج محفوظ کریں",localHint:"پہلے نمونے کے طور پر استعمال کریں۔ حساس یا سرکاری ریکارڈ درج نہ کریں۔",listTitle:"حالیہ اندراجات",thDate:"تاریخ",thDetail:"تفصیل",thType:"قسم",thAmount:"رقم",empty:"ابھی کوئی اندراج نہیں۔ پہلا اندراج شامل کریں۔",search:"تفصیل یا مد تلاش کریں",clear:"تمام حذف کریں",language:"English"}
+};
+function setLanguage(){
+ const t=translations[lang];Object.keys(t).forEach(k=>{const map={search:"search",clear:"clear",language:"language"};const id=map[k]||k;if($(id))$(id).textContent=t[k]});
+ $("search").placeholder=t.search;$("clearButton").textContent=t.clear;$("languageButton").textContent=t.language;
+ document.documentElement.lang=lang;$("brand").dir=lang==="ur"?"rtl":"ltr";document.querySelector("main").dir=lang==="ur"?"rtl":"ltr";render();
+}
+$("entryForm").addEventListener("submit",async e=>{
+ e.preventDefault();const amount=Number($("amount").value);
+ if(!Number.isFinite(amount)||amount<=0){alert("Please enter an amount greater than zero.");return}
+ await addEntry({kind:$("kind").value,date:$("date").value,category:$("category").value,description:$("description").value.trim(),amount,reference:$("reference").value.trim(),createdAt:new Date().toISOString()});
+ entries=await getAll();$("description").value="";$("amount").value="";$("reference").value="";render();
+});
+$("search").addEventListener("input",render);
+$("clearButton").addEventListener("click",async()=>{if(confirm("Delete every local transaction from this device? This cannot be undone.")){await clearEntries();entries=await getAll();render()}});
+$("exportButton").addEventListener("click",()=>{
+ const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+ const csv=[["Date","Type","Category","Description","Amount INR","Reference"],...entries.map(e=>[e.date,e.kind,e.category,e.description,e.amount,e.reference])].map(row=>row.map(quote).join(",")).join("\r\n");
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));a.download="darul-falah-transactions.csv";a.click();URL.revokeObjectURL(a.href);
+});
+$("languageButton").addEventListener("click",()=>{lang=lang==="en"?"ur":"en";setLanguage()});
+$("date").value=new Date().toISOString().slice(0,10);
+(async()=>{try{db=await openDB();entries=await getAll();render();if("serviceWorker" in navigator && location.protocol.startsWith("http"))navigator.serviceWorker.register("./service-worker.js").catch(()=>{});}catch(err){console.error(err);alert("Local database could not be opened in this browser.")}})();
+</script>
+</body>
+</html>
